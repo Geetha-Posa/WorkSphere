@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { User, Task } from './types';
-import { INITIAL_USERS, INITIAL_TASKS } from './mockData';
+import { INITIAL_TASKS } from './mockData';
 import { Header } from './components/Header';
 import { LoginPage } from './components/LoginPage';
 import { AdminPanel } from './components/AdminPanel';
@@ -9,9 +9,11 @@ import { EmployeePanel } from './components/EmployeePanel';
 import { AccessDenied } from './components/AccessDenied';
 
 export default function App() {
-  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
   const [tasks] = useState<Task[]>(INITIAL_TASKS);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const savedUser = localStorage.getItem('user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
   const [currentPath, setCurrentPath] = useState<string>(() => {
     const path = window.location.pathname;
     if (path === '/admin' || path === '/manager' || path === '/employee' || path === '/login') {
@@ -44,21 +46,16 @@ export default function App() {
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
+    localStorage.setItem('user', JSON.stringify(user));
     const targetRoute = `/${user.role}`;
     navigate(targetRoute);
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
     navigate('/login');
-  };
-
-  const handleAddUser = (newUserData: Omit<User, 'id'>) => {
-    const newUser: User = {
-      ...newUserData,
-      id: `u-${Date.now()}`,
-    };
-    setUsers((prev) => [...prev, newUser]);
   };
 
   // Render view based on authentication and route
@@ -66,7 +63,7 @@ export default function App() {
     // 1. Not logged in
     if (!currentUser) {
       if (currentPath === '/login' || currentPath === '/') {
-        return <LoginPage users={users} onLogin={handleLogin} />;
+        return <LoginPage onLogin={handleLogin} />;
       }
       // Accessing protected route while logged out
       return (
@@ -92,7 +89,7 @@ export default function App() {
     // 3. Admin Route
     if (currentPath === '/admin') {
       if (currentUser.role === 'admin') {
-        return <AdminPanel users={users} onAddUser={handleAddUser} />;
+        return <AdminPanel />;
       }
       return (
         <AccessDenied

@@ -1,12 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
 
-interface AdminPanelProps {
-  users: User[];
-  onAddUser: (newUser: Omit<User, 'id'>) => void;
-}
-
-export const AdminPanel: React.FC<AdminPanelProps> = ({ users, onAddUser }) => {
+export const AdminPanel: React.FC = () => {
+  const [users, setUsers] = useState<User[]>([]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -15,7 +11,34 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ users, onAddUser }) => {
   const [successNotice, setSuccessNotice] = useState('');
   const [errorNotice, setErrorNotice] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/users', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const formattedUsers = data.map((u: any) => ({
+            id: u._id,
+            name: u.name,
+            email: u.email,
+            role: u.role as UserRole,
+            team: u.team,
+          }));
+          setUsers(formattedUsers);
+        }
+      } catch (error) {
+        console.error('Failed to fetch users', error);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSuccessNotice('');
     setErrorNotice('');
@@ -29,25 +52,46 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ users, onAddUser }) => {
       return;
     }
 
-    if (users.some((u) => u.email.toLowerCase() === trimmedEmail.toLowerCase())) {
-      setErrorNotice('A user with this email already exists.');
-      return;
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: trimmedName,
+          email: trimmedEmail,
+          password: password,
+          role: role,
+          team: trimmedTeam,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setUsers(prev => [...prev, {
+          id: data._id,
+          name: data.name,
+          email: data.email,
+          role: data.role as UserRole,
+          team: data.team,
+        }]);
+
+        setSuccessNotice(`User "${data.name}" created successfully.`);
+        setName('');
+        setEmail('');
+        setPassword('');
+        setRole('employee');
+        setTeam('');
+      } else {
+        setErrorNotice(data.message || 'Failed to create user.');
+      }
+    } catch (error) {
+      setErrorNotice('Network error. Please try again later.');
     }
-
-    onAddUser({
-      name: trimmedName,
-      email: trimmedEmail,
-      password: password,
-      role: role as UserRole,
-      team: trimmedTeam,
-    });
-
-    setSuccessNotice(`User "${trimmedName}" created successfully.`);
-    setName('');
-    setEmail('');
-    setPassword('');
-    setRole('employee');
-    setTeam('');
   };
 
   return (
