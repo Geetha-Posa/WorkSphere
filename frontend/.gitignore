@@ -1,10 +1,27 @@
+# Dependencies
 node_modules/
+
+# Production & Build outputs
 build/
 dist/
 coverage/
-.DS_Store
-*.log
+
+# Environment variables & secrets
 .env*
 !.env.example
+
+# Service Account & Key Files
+*service-account*.json
+*credentials*.json
+*.pem
+*.key
+*.p12
+
+# Logs & System files
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
 
 .antigravity/

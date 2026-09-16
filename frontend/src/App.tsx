@@ -104,7 +104,7 @@ export default function App() {
     // 4. Manager Route
     if (currentPath === '/manager') {
       if (currentUser.role === 'manager') {
-        return <ManagerPanel tasks={tasks} />;
+        return <ManagerPanel currentUser={currentUser} tasks={tasks} />;
       }
       return (
         <AccessDenied
