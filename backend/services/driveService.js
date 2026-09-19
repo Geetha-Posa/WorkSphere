@@ -55,6 +55,24 @@ const listFilesInTeamFolder = async (teamName) => {
   }));
 };
 
+/**
+ * Downloads a file from Google Drive as a Buffer.
+ * @param {string} fileId - The ID of the file to download
+ * @returns {Promise<Buffer>}
+ */
+const downloadFileBuffer = async (fileId) => {
+  const auth = getGoogleAuth();
+  const drive = google.drive({ version: 'v3', auth });
+  
+  const response = await drive.files.get(
+    { fileId, alt: 'media' },
+    { responseType: 'arraybuffer' }
+  );
+  
+  return Buffer.from(response.data);
+};
+
 module.exports = {
   listFilesInTeamFolder,
+  downloadFileBuffer,
 };

@@ -1,13 +1,34 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Task, User } from '../types';
 
 interface EmployeePanelProps {
   currentUser: User;
-  tasks: Task[];
 }
 
-export const EmployeePanel: React.FC<EmployeePanelProps> = ({ currentUser, tasks }) => {
-  const assignedTasks = tasks.filter((task) => task.assignedTo === currentUser.id);
+export const EmployeePanel: React.FC<EmployeePanelProps> = ({ currentUser }) => {
+  const [tasks, setTasks] = useState<Task[]>([]);
+
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/tasks/mine', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setTasks(data);
+        }
+      } catch (error) {
+        console.error('Error fetching tasks:', error);
+      }
+    };
+    fetchTasks();
+  }, []);
+
+  const assignedTasks = tasks.filter((task) => task.assignedTo === currentUser.id || !task.assignedTo); // Or we can rely on backend filtering. Since backend returns our assigned tasks, we just use tasks directly.
 
   return (
     <div id="employee-panel" className="max-w-6xl mx-auto py-8 px-4 space-y-6">
@@ -29,11 +50,11 @@ export const EmployeePanel: React.FC<EmployeePanelProps> = ({ currentUser, tasks
             Assigned Tasks
           </h2>
           <span id="assigned-tasks-count" className="text-xs text-gray-500 font-mono">
-            Assigned: {assignedTasks.length}
+            Assigned: {tasks.length}
           </span>
         </div>
 
-        {assignedTasks.length === 0 ? (
+        {tasks.length === 0 ? (
           <div
             id="no-tasks-assigned-notice"
             className="py-8 text-center text-sm text-gray-500 bg-gray-50 rounded border border-dashed border-gray-200"
@@ -51,8 +72,8 @@ export const EmployeePanel: React.FC<EmployeePanelProps> = ({ currentUser, tasks
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {assignedTasks.map((task) => (
-                  <tr key={task.id} id={`emp-task-row-${task.id}`} className="hover:bg-gray-50">
+                {tasks.map((task) => (
+                  <tr key={task.id || (task as any)._id} id={`emp-task-row-${task.id || (task as any)._id}`} className="hover:bg-gray-50">
                     <td className="py-2.5 px-3 font-medium text-gray-900">{task.title}</td>
                     <td className="py-2.5 px-3">
                       <span

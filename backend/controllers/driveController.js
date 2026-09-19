@@ -1,4 +1,6 @@
-const { listFilesInTeamFolder } = require('../services/driveService');
+const { listFilesInTeamFolder, downloadFileBuffer } = require('../services/driveService');
+const { extractTextFromBuffer } = require('../services/ocrClient');
+const Task = require('../models/Task');
 
 const syncTeamDriveFiles = async (req, res) => {
   try {
@@ -11,8 +13,48 @@ const syncTeamDriveFiles = async (req, res) => {
 
     const files = await listFilesInTeamFolder(teamName);
 
+    // Process new files
+    let newTasksCount = 0;
+    let skippedCount = 0;
+
+    for (const file of files) {
+      try {
+        const existingTask = await Task.findOne({ driveFileId: file.id });
+        if (existingTask) {
+          console.log(`Task for file ${file.name} already exists. Skipping.`);
+          skippedCount++;
+          continue;
+        }
+
+        console.log(`Downloading file: ${file.name} (${file.id})`);
+        const buffer = await downloadFileBuffer(file.id);
+        
+        console.log(`Extracting text for: ${file.name}`);
+        const extractedText = await extractTextFromBuffer(buffer, file.name);
+        
+        console.log(`\n--- Extracted Text for ${file.name} ---\n`);
+        console.log(extractedText);
+        console.log(`\n---------------------------------------\n`);
+
+        const newTask = new Task({
+          driveFileId: file.id,
+          filename: file.name,
+          team: teamName,
+          extractedText: extractedText,
+          title: file.name
+        });
+        await newTask.save();
+        newTasksCount++;
+
+      } catch (err) {
+        console.error(`Failed to process ${file.name}:`, err.message);
+      }
+    }
+
     return res.status(200).json({
-      message: `Found ${files.length} documents`,
+      message: `Sync complete. ${newTasksCount} new tasks created, ${skippedCount} skipped.`,
+      newTasksCount,
+      skippedCount,
       files,
     });
   } catch (error) {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Task, User } from '../types';
 
 export interface DriveFile {
@@ -10,16 +10,37 @@ export interface DriveFile {
 
 interface ManagerPanelProps {
   currentUser?: User;
-  tasks?: Task[];
 }
 
 export const ManagerPanel: React.FC<ManagerPanelProps> = ({ currentUser }) => {
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [syncedFiles, setSyncedFiles] = useState<DriveFile[]>([]);
+
+  const [tasks, setTasks] = useState<Task[]>([]);
 
   const teamName = currentUser?.team || 'Engineering';
+
+  const fetchTasks = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/tasks/mine', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setTasks(data);
+      }
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchTasks();
+  }, []);
 
   const handleSyncNow = async () => {
     if (isSyncing) return;
@@ -41,8 +62,8 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ currentUser }) => {
       const data = await response.json();
 
       if (response.ok) {
-        setSyncedFiles(data.files || []);
-        setSyncStatus(data.message || `Successfully synced ${data.files?.length || 0} documents.`);
+        setSyncStatus(data.message || `Successfully synced documents.`);
+        await fetchTasks();
       } else {
         setSyncError(data.message || 'Failed to sync Drive files. Please check server configuration.');
         setSyncStatus(null);
@@ -105,7 +126,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ currentUser }) => {
             </button>
 
             <span id="synced-files-count" className="text-xs text-gray-500 font-mono bg-gray-50 border border-gray-200 px-2.5 py-1 rounded">
-              Files: {syncedFiles.length}
+              Files: {tasks.length}
             </span>
           </div>
         </div>
@@ -128,7 +149,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ currentUser }) => {
           </div>
         )}
 
-        {syncedFiles.length === 0 ? (
+        {tasks.length === 0 ? (
           <div
             id="no-synced-files-notice"
             className="py-12 text-center text-sm text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-200"
@@ -148,8 +169,14 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ currentUser }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {syncedFiles.map((file) => (
-                  <tr key={file.id} id={`drive-file-row-${file.id}`} className="hover:bg-gray-50">
+                {tasks.map((task) => {
+                  const keyId = task._id || task.id || task.driveFileId;
+                  const displayId = task.driveFileId || keyId;
+                  const displayName = task.filename || task.title;
+                  const displayDate = task.updatedAt || task.createdAt || '';
+                  
+                  return (
+                  <tr key={keyId} id={`drive-file-row-${keyId}`} className="hover:bg-gray-50">
                     <td className="py-2.5 px-3 font-medium text-gray-900 flex items-center gap-2">
                       <svg
                         className="w-4 h-4 text-blue-600 flex-shrink-0"
@@ -164,12 +191,12 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ currentUser }) => {
                           d="M7 21h10a2 2 0 002-2V7.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 1H7a2 2 0 00-2 2v16a2 2 0 002 2z"
                         />
                       </svg>
-                      <span>{file.name}</span>
+                      <span>{displayName}</span>
                     </td>
-                    <td className="py-2.5 px-3 text-xs font-mono text-gray-500">{file.id}</td>
-                    <td className="py-2.5 px-3 text-xs text-gray-600">{formatDate(file.modifiedTime)}</td>
+                    <td className="py-2.5 px-3 text-xs font-mono text-gray-500">{displayId}</td>
+                    <td className="py-2.5 px-3 text-xs text-gray-600">{formatDate(displayDate)}</td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>

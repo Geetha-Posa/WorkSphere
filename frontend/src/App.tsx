@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User, Task } from './types';
-import { INITIAL_TASKS } from './mockData';
+import { User } from './types';
 import { Header } from './components/Header';
 import { LoginPage } from './components/LoginPage';
 import { AdminPanel } from './components/AdminPanel';
@@ -9,7 +8,6 @@ import { EmployeePanel } from './components/EmployeePanel';
 import { AccessDenied } from './components/AccessDenied';
 
 export default function App() {
-  const [tasks] = useState<Task[]>(INITIAL_TASKS);
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const savedUser = localStorage.getItem('user');
     return savedUser ? JSON.parse(savedUser) : null;
@@ -104,7 +102,7 @@ export default function App() {
     // 4. Manager Route
     if (currentPath === '/manager') {
       if (currentUser.role === 'manager') {
-        return <ManagerPanel currentUser={currentUser} tasks={tasks} />;
+        return <ManagerPanel currentUser={currentUser} />;
       }
       return (
         <AccessDenied
@@ -119,7 +117,7 @@ export default function App() {
     // 5. Employee Route
     if (currentPath === '/employee') {
       if (currentUser.role === 'employee') {
-        return <EmployeePanel currentUser={currentUser} tasks={tasks} />;
+        return <EmployeePanel currentUser={currentUser} />;
       }
       return (
         <AccessDenied

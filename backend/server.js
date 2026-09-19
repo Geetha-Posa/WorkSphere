@@ -16,11 +16,13 @@ app.use(express.json());
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const driveRoutes = require('./routes/driveRoutes');
+const taskRoutes = require('./routes/taskRoutes');
 
 // Mount routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/drive', driveRoutes);
+app.use('/api/tasks', taskRoutes);
 
 // Basic route for testing
 app.get('/', (req, res) => {

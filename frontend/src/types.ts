@@ -13,8 +13,13 @@ export interface User {
 
 export interface Task {
   id: string;
+  _id?: string;
   title: string;
   status: TaskStatus;
   assignedTo: string;
   team: string;
+  driveFileId?: string;
+  filename?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
