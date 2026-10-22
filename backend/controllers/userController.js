@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Team = require('../models/Team');
 const bcrypt = require('bcryptjs');
 
 const createUser = async (req, res) => {
@@ -11,6 +12,33 @@ const createUser = async (req, res) => {
 
     if (!['manager', 'employee'].includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
+    }
+
+    // Require team and verify it exists in DB for manager and employee
+    if (!team || typeof team !== 'string' || !team.trim()) {
+      return res.status(400).json({ message: 'Team is required for manager and employee roles' });
+    }
+
+    const teamDoc = await Team.findOne({
+      name: { $regex: new RegExp(`^${team.trim()}$`, 'i') },
+    });
+
+    if (!teamDoc) {
+      return res.status(400).json({ message: `Team '${team}' does not exist` });
+    }
+
+    const canonicalTeamName = teamDoc.name;
+
+    // Check one manager per team
+    if (role === 'manager') {
+      const existingManager = await User.findOne({
+        role: 'manager',
+        team: { $regex: new RegExp(`^${canonicalTeamName}$`, 'i') },
+      });
+
+      if (existingManager) {
+        return res.status(400).json({ message: `A manager already exists for team '${canonicalTeamName}'` });
+      }
     }
 
     const userExists = await User.findOne({ email });
@@ -26,7 +54,7 @@ const createUser = async (req, res) => {
       email,
       password: hashedPassword,
       role,
-      team: team || null,
+      team: canonicalTeamName,
       expertiseTags: expertiseTags || [],
     });
 

@@ -1,64 +1,148 @@
 import React, { useState, useEffect } from 'react';
-import { User, UserRole } from '../types';
+import { User, UserRole, Team } from '../types';
 
 export const AdminPanel: React.FC = () => {
+  // Teams state
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [teamsLoading, setTeamsLoading] = useState(false);
+  const [teamName, setTeamName] = useState('');
+  const [driveFolderId, setDriveFolderId] = useState('');
+  const [teamSuccessNotice, setTeamSuccessNotice] = useState('');
+  const [teamErrorNotice, setTeamErrorNotice] = useState('');
+  const [teamSubmitting, setTeamSubmitting] = useState(false);
+
+  // Users state
   const [users, setUsers] = useState<User[]>([]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'manager' | 'employee'>('employee');
   const [team, setTeam] = useState('');
-  const [successNotice, setSuccessNotice] = useState('');
-  const [errorNotice, setErrorNotice] = useState('');
+  const [userSuccessNotice, setUserSuccessNotice] = useState('');
+  const [userErrorNotice, setUserErrorNotice] = useState('');
+  const [userSubmitting, setUserSubmitting] = useState(false);
+
+  const fetchUsers = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/users', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const formattedUsers = data.map((u: any) => ({
+          id: u._id,
+          name: u.name,
+          email: u.email,
+          role: u.role as UserRole,
+          team: u.team,
+        }));
+        setUsers(formattedUsers);
+      }
+    } catch (error) {
+      console.error('Failed to fetch users', error);
+    }
+  };
+
+  const fetchTeams = async () => {
+    try {
+      setTeamsLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/teams', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setTeams(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch teams', error);
+    } finally {
+      setTeamsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('/api/users', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          const formattedUsers = data.map((u: any) => ({
-            id: u._id,
-            name: u.name,
-            email: u.email,
-            role: u.role as UserRole,
-            team: u.team,
-          }));
-          setUsers(formattedUsers);
-        }
-      } catch (error) {
-        console.error('Failed to fetch users', error);
-      }
-    };
     fetchUsers();
+    fetchTeams();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSuccessNotice('');
-    setErrorNotice('');
+    setTeamSuccessNotice('');
+    setTeamErrorNotice('');
+
+    const trimmedName = teamName.trim();
+    const trimmedFolderId = driveFolderId.trim();
+
+    if (!trimmedName || !trimmedFolderId) {
+      setTeamErrorNotice('Team name and Drive folder ID are required.');
+      return;
+    }
+
+    try {
+      setTeamSubmitting(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/teams', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: trimmedName,
+          driveFolderId: trimmedFolderId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setTeamSuccessNotice(`Team "${data.name}" created successfully.`);
+        setTeamName('');
+        setDriveFolderId('');
+        await fetchTeams();
+      } else {
+        setTeamErrorNotice(data.message || 'Failed to create team.');
+      }
+    } catch (error) {
+      setTeamErrorNotice('Network error. Please try again later.');
+    } finally {
+      setTeamSubmitting(false);
+    }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUserSuccessNotice('');
+    setUserErrorNotice('');
 
     const trimmedName = name.trim();
     const trimmedEmail = email.trim();
     const trimmedTeam = team.trim();
 
-    if (!trimmedName || !trimmedEmail || !password || !trimmedTeam) {
-      setErrorNotice('All fields are required.');
+    if (!trimmedName || !trimmedEmail || !password) {
+      setUserErrorNotice('Name, email, and password are required.');
+      return;
+    }
+
+    if (['manager', 'employee'].includes(role) && !trimmedTeam) {
+      setUserErrorNotice('Please select a team.');
       return;
     }
 
     try {
+      setUserSubmitting(true);
       const token = localStorage.getItem('token');
       const response = await fetch('/api/users', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           name: trimmedName,
@@ -72,25 +156,30 @@ export const AdminPanel: React.FC = () => {
       const data = await response.json();
 
       if (response.ok) {
-        setUsers(prev => [...prev, {
-          id: data._id,
-          name: data.name,
-          email: data.email,
-          role: data.role as UserRole,
-          team: data.team,
-        }]);
+        setUsers((prev) => [
+          ...prev,
+          {
+            id: data._id,
+            name: data.name,
+            email: data.email,
+            role: data.role as UserRole,
+            team: data.team,
+          },
+        ]);
 
-        setSuccessNotice(`User "${data.name}" created successfully.`);
+        setUserSuccessNotice(`User "${data.name}" created successfully.`);
         setName('');
         setEmail('');
         setPassword('');
         setRole('employee');
         setTeam('');
       } else {
-        setErrorNotice(data.message || 'Failed to create user.');
+        setUserErrorNotice(data.message || 'Failed to create user.');
       }
     } catch (error) {
-      setErrorNotice('Network error. Please try again later.');
+      setUserErrorNotice('Network error. Please try again later.');
+    } finally {
+      setUserSubmitting(false);
     }
   };
 
@@ -101,9 +190,136 @@ export const AdminPanel: React.FC = () => {
           Admin Panel
         </h1>
         <p className="text-sm text-gray-500 mt-1">
-          Manage user accounts and organization access.
+          Manage teams, user accounts, and organization access.
         </p>
       </div>
+
+      {/* Create New Team Section */}
+      <section
+        id="admin-create-team-section"
+        className="bg-white border border-gray-200 rounded-lg p-6"
+      >
+        <h2 id="create-team-heading" className="text-base font-semibold text-gray-900 mb-4">
+          Create New Team
+        </h2>
+
+        {teamSuccessNotice && (
+          <div
+            id="team-success-notice"
+            className="mb-4 p-3 bg-green-50 border border-green-200 text-green-800 text-sm rounded"
+          >
+            {teamSuccessNotice}
+          </div>
+        )}
+
+        {teamErrorNotice && (
+          <div
+            id="team-error-notice"
+            className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded"
+          >
+            {teamErrorNotice}
+          </div>
+        )}
+
+        <form id="create-team-form" onSubmit={handleCreateTeam} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label
+                htmlFor="team-name-input"
+                className="block text-xs font-medium text-gray-700 mb-1"
+              >
+                Team Name
+              </label>
+              <input
+                id="team-name-input"
+                type="text"
+                required
+                value={teamName}
+                onChange={(e) => setTeamName(e.target.value)}
+                placeholder="e.g. Design, Mobile, Security"
+                className="w-full px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="team-folder-id-input"
+                className="block text-xs font-medium text-gray-700 mb-1"
+              >
+                Google Drive Folder ID
+              </label>
+              <input
+                id="team-folder-id-input"
+                type="text"
+                required
+                value={driveFolderId}
+                onChange={(e) => setDriveFolderId(e.target.value)}
+                placeholder="e.g. 1kOZ_kAxRcwj4LElCBVjIGX-HSDP45ldv"
+                className="w-full px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
+              />
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <button
+              id="create-team-submit-button"
+              type="submit"
+              disabled={teamSubmitting}
+              className="bg-gray-900 hover:bg-gray-800 text-white font-medium py-2 px-5 rounded text-sm cursor-pointer transition-colors disabled:opacity-50"
+            >
+              {teamSubmitting ? 'Verifying & Adding...' : 'Add Team'}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      {/* Existing Teams Table */}
+      <section
+        id="admin-teams-list-section"
+        className="bg-white border border-gray-200 rounded-lg p-6"
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h2 id="existing-teams-heading" className="text-base font-semibold text-gray-900">
+            Existing Teams
+          </h2>
+          <span id="teams-count-badge" className="text-xs text-gray-500 font-mono">
+            Total: {teams.length}
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table id="teams-table" className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50">
+                <th className="py-2.5 px-3">Team Name</th>
+                <th className="py-2.5 px-3">Drive Folder ID</th>
+                <th className="py-2.5 px-3">Created</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {teams.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="py-4 text-center text-sm text-gray-500">
+                    {teamsLoading ? 'Loading teams...' : 'No teams found. Create one above.'}
+                  </td>
+                </tr>
+              ) : (
+                teams.map((t) => (
+                  <tr key={t._id} id={`team-row-${t._id}`} className="hover:bg-gray-50">
+                    <td className="py-2.5 px-3 font-medium text-gray-900">{t.name}</td>
+                    <td className="py-2.5 px-3 text-gray-600 font-mono text-xs">
+                      {t.driveFolderId || '—'}
+                    </td>
+                    <td className="py-2.5 px-3 text-gray-500 text-xs">
+                      {t.createdAt ? new Date(t.createdAt).toLocaleDateString() : '—'}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       {/* Create New User Section */}
       <section
@@ -114,25 +330,25 @@ export const AdminPanel: React.FC = () => {
           Create New User
         </h2>
 
-        {successNotice && (
+        {userSuccessNotice && (
           <div
             id="admin-success-notice"
             className="mb-4 p-3 bg-green-50 border border-green-200 text-green-800 text-sm rounded"
           >
-            {successNotice}
+            {userSuccessNotice}
           </div>
         )}
 
-        {errorNotice && (
+        {userErrorNotice && (
           <div
             id="admin-error-notice"
             className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded"
           >
-            {errorNotice}
+            {userErrorNotice}
           </div>
         )}
 
-        <form id="create-user-form" onSubmit={handleSubmit} className="space-y-4">
+        <form id="create-user-form" onSubmit={handleCreateUser} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label
@@ -206,32 +422,45 @@ export const AdminPanel: React.FC = () => {
               </select>
             </div>
 
-            <div className="md:col-span-2">
-              <label
-                htmlFor="user-team-input"
-                className="block text-xs font-medium text-gray-700 mb-1"
-              >
-                Team
-              </label>
-              <input
-                id="user-team-input"
-                type="text"
-                required
-                value={team}
-                onChange={(e) => setTeam(e.target.value)}
-                placeholder="e.g. Engineering or Design"
-                className="w-full px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
-              />
-            </div>
+            {['manager', 'employee'].includes(role) && (
+              <div className="md:col-span-2">
+                <label
+                  htmlFor="user-team-select"
+                  className="block text-xs font-medium text-gray-700 mb-1"
+                >
+                  Team
+                </label>
+                <select
+                  id="user-team-select"
+                  required
+                  value={team}
+                  onChange={(e) => setTeam(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 bg-white focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
+                >
+                  <option value="">Select a team</option>
+                  {teams.map((t) => (
+                    <option key={t._id} value={t.name}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+                {teams.length === 0 && !teamsLoading && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    No teams available. Create a team above before adding users.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="pt-2">
             <button
               id="create-user-submit-button"
               type="submit"
-              className="bg-gray-900 hover:bg-gray-800 text-white font-medium py-2 px-5 rounded text-sm cursor-pointer transition-colors"
+              disabled={userSubmitting}
+              className="bg-gray-900 hover:bg-gray-800 text-white font-medium py-2 px-5 rounded text-sm cursor-pointer transition-colors disabled:opacity-50"
             >
-              Add User
+              {userSubmitting ? 'Adding...' : 'Add User'}
             </button>
           </div>
         </form>
@@ -279,7 +508,7 @@ export const AdminPanel: React.FC = () => {
                       {u.role}
                     </span>
                   </td>
-                  <td className="py-2.5 px-3 text-gray-700">{u.team}</td>
+                  <td className="py-2.5 px-3 text-gray-700">{u.team || '—'}</td>
                 </tr>
               ))}
             </tbody>

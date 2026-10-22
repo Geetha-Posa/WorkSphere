@@ -25,15 +25,36 @@ const getGoogleAuth = () => {
 };
 
 /**
+ * Verifies that a folder is reachable and accessible by the service account.
+ * @param {string} folderId - The Google Drive Folder ID
+ * @returns {Promise<object>} Folder metadata
+ */
+const verifyFolderAccess = async (folderId) => {
+  const auth = getGoogleAuth();
+  const drive = google.drive({ version: 'v3', auth });
+
+  const response = await drive.files.get({
+    fileId: folderId,
+    fields: 'id, name, mimeType, trashed',
+  });
+
+  if (response.data.trashed) {
+    throw new Error('Folder is in trash');
+  }
+
+  return response.data;
+};
+
+/**
  * Lists active (non-trashed) files from a team's Google Drive folder.
  * @param {string} teamName - Name of the team (e.g., 'Engineering', 'Design')
  * @returns {Promise<Array<{ id: string, name: string, mimeType: string, modifiedTime: string }>>}
  */
 const listFilesInTeamFolder = async (teamName) => {
-  const folderId = getTeamFolderId(teamName);
+  const folderId = await getTeamFolderId(teamName);
 
   if (!folderId) {
-    throw new Error(`No Google Drive folder configured for team '${teamName}'. Please check your environment variables.`);
+    throw new Error(`No Google Drive folder configured for team '${teamName}'.`);
   }
 
   const auth = getGoogleAuth();
@@ -73,6 +94,8 @@ const downloadFileBuffer = async (fileId) => {
 };
 
 module.exports = {
+  getGoogleAuth,
+  verifyFolderAccess,
   listFilesInTeamFolder,
   downloadFileBuffer,
 };

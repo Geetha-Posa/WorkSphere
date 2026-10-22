@@ -1,5 +1,6 @@
 const { listFilesInTeamFolder, downloadFileBuffer } = require('../services/driveService');
 const { extractTextFromBuffer } = require('../services/ocrClient');
+const { summarizeTask } = require('../services/llmService');
 const Task = require('../models/Task');
 
 const syncTeamDriveFiles = async (req, res) => {
@@ -36,13 +37,28 @@ const syncTeamDriveFiles = async (req, res) => {
         console.log(extractedText);
         console.log(`\n---------------------------------------\n`);
 
-        const newTask = new Task({
+        console.log(`Summarizing task with Gemini for: ${file.name}`);
+        const summaryData = await summarizeTask(extractedText);
+
+        const taskData = {
           driveFileId: file.id,
           filename: file.name,
           team: teamName,
           extractedText: extractedText,
-          title: file.name
-        });
+          status: 'unassigned',
+          title: summaryData ? summaryData.title : null,
+          summary: summaryData ? summaryData.summary : null,
+          project: summaryData ? summaryData.project : null,
+          taskType: summaryData ? summaryData.taskType : null,
+          requiredSkills: summaryData ? summaryData.requiredSkills : [],
+          deliverables: summaryData ? summaryData.deliverables : [],
+          deadline: summaryData ? summaryData.deadline : null,
+          priority: summaryData ? summaryData.priority : null,
+          difficulty: summaryData ? summaryData.difficulty : null,
+          summaryStatus: summaryData ? 'done' : 'failed',
+        };
+
+        const newTask = new Task(taskData);
         await newTask.save();
         newTasksCount++;
 

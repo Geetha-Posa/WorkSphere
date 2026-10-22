@@ -11,6 +11,14 @@ export interface User {
   team: string;
 }
 
+export interface Team {
+  _id: string;
+  name: string;
+  driveFolderId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Task {
   id: string;
   _id?: string;

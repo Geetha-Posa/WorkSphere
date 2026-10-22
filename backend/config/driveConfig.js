@@ -1,24 +1,28 @@
+const Team = require('../models/Team');
+
 /**
  * Google Drive Team Folder Configuration
- * Maps team names to their respective Google Drive Folder IDs stored in environment variables.
+ * Reads team's Google Drive Folder ID from MongoDB (case-insensitive name match).
  */
-
-const getTeamFolderId = (teamName) => {
+const getTeamFolderId = async (teamName) => {
   if (!teamName || typeof teamName !== 'string') {
     return null;
   }
 
-  const normalized = teamName.trim().toLowerCase();
+  const trimmed = teamName.trim();
+  if (!trimmed) {
+    return null;
+  }
 
-  const folderMap = {
-    design: process.env.DRIVE_FOLDER_DESIGN,
-    engineering: process.env.DRIVE_FOLDER_ENGINEERING,
-    qa: process.env.DRIVE_FOLDER_QA,
-    devops: process.env.DRIVE_FOLDER_DEVOPS,
-  };
+  const team = await Team.findOne({
+    name: { $regex: new RegExp(`^${trimmed}$`, 'i') },
+  });
 
-  const folderId = folderMap[normalized];
-  return folderId && folderId.trim() !== '' ? folderId.trim() : null;
+  if (!team || !team.driveFolderId || !team.driveFolderId.trim()) {
+    return null;
+  }
+
+  return team.driveFolderId.trim();
 };
 
 module.exports = {
