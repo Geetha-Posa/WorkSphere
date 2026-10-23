@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Task, User } from '../types';
+import { apiFetch } from '../api/client';
 
 interface EmployeePanelProps {
   currentUser: User;
@@ -11,12 +12,7 @@ export const EmployeePanel: React.FC<EmployeePanelProps> = ({ currentUser }) => 
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('/api/tasks/mine', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+        const response = await apiFetch('/api/tasks/mine');
         if (response.ok) {
           const data = await response.json();
           setTasks(data);
@@ -27,6 +23,7 @@ export const EmployeePanel: React.FC<EmployeePanelProps> = ({ currentUser }) => 
     };
     fetchTasks();
   }, []);
+
 
   const assignedTasks = tasks.filter((task) => task.assignedTo === currentUser.id || !task.assignedTo); // Or we can rely on backend filtering. Since backend returns our assigned tasks, we just use tasks directly.
 

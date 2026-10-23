@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { User } from './types';
 import { Header } from './components/Header';
 import { LoginPage } from './components/LoginPage';
@@ -6,12 +6,16 @@ import { AdminPanel } from './components/AdminPanel';
 import { ManagerPanel } from './components/ManagerPanel';
 import { EmployeePanel } from './components/EmployeePanel';
 import { AccessDenied } from './components/AccessDenied';
+import {
+  apiFetch,
+  setAccessToken,
+  setOnAuthFailure,
+  setOnUserUpdate,
+} from './api/client';
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const savedUser = localStorage.getItem('user');
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isSessionLoading, setIsSessionLoading] = useState<boolean>(true);
   const [currentPath, setCurrentPath] = useState<string>(() => {
     const path = window.location.pathname;
     if (path === '/admin' || path === '/manager' || path === '/employee' || path === '/login') {
@@ -19,6 +23,13 @@ export default function App() {
     }
     return '/login';
   });
+
+  const navigate = useCallback((path: string) => {
+    if (window.location.pathname !== path) {
+      window.history.pushState({}, '', path);
+    }
+    setCurrentPath(path);
+  }, []);
 
   // Sync with browser history
   useEffect(() => {
@@ -35,26 +46,95 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const navigate = (path: string) => {
-    if (window.location.pathname !== path) {
-      window.history.pushState({}, '', path);
-    }
-    setCurrentPath(path);
-  };
+  // Clear legacy tokens and restore session on app load
+  useEffect(() => {
+    // Ensure no tokens or roles remain in localStorage
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    localStorage.removeItem('role');
+
+    // Register auth callbacks
+    setOnAuthFailure(() => {
+      setAccessToken(null);
+      setCurrentUser(null);
+      navigate('/login');
+    });
+
+    setOnUserUpdate((user: User) => {
+      setCurrentUser(user);
+    });
+
+    const restoreSession = async () => {
+      try {
+        const response = await fetch('/api/auth/refresh', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setAccessToken(data.accessToken);
+          setCurrentUser(data.user);
+        } else {
+          setAccessToken(null);
+          setCurrentUser(null);
+        }
+      } catch (error) {
+        setAccessToken(null);
+        setCurrentUser(null);
+      } finally {
+        setIsSessionLoading(false);
+      }
+    };
+
+    restoreSession();
+  }, [navigate]);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
-    localStorage.setItem('user', JSON.stringify(user));
     const targetRoute = `/${user.role}`;
     navigate(targetRoute);
   };
 
-  const handleLogout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setAccessToken(null);
+      setCurrentUser(null);
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      localStorage.removeItem('role');
+      navigate('/login');
+    }
   };
+
+  // If logged in and on login route, handle automatic redirection
+  useEffect(() => {
+    if (!isSessionLoading && currentUser && (currentPath === '/login' || currentPath === '/')) {
+      navigate(`/${currentUser.role}`);
+    }
+  }, [isSessionLoading, currentUser, currentPath, navigate]);
+
+  // Loading state while restoring session on app load
+  if (isSessionLoading) {
+    return (
+      <div
+        id="session-loading-screen"
+        className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4"
+      >
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-8 h-8 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin"></div>
+          <p className="text-sm font-medium text-gray-600">Restoring session...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Render view based on authentication and route
   const renderContent = () => {
@@ -76,7 +156,6 @@ export default function App() {
 
     // 2. Logged in, navigating to /login
     if (currentPath === '/login' || currentPath === '/') {
-      // Auto-redirect to role panel
       return (
         <div className="py-12 text-center text-sm text-gray-500">
           Redirecting to /{currentUser.role}...
@@ -143,13 +222,6 @@ export default function App() {
       </div>
     );
   };
-
-  // If logged in and on login route, handle automatic redirection
-  useEffect(() => {
-    if (currentUser && (currentPath === '/login' || currentPath === '/')) {
-      navigate(`/${currentUser.role}`);
-    }
-  }, [currentUser, currentPath]);
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col font-sans antialiased">

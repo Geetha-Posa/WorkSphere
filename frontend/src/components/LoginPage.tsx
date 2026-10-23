@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { User } from '../types';
+import { apiFetch, setAccessToken } from '../api/client';
 
 interface LoginPageProps {
   onLogin: (user: User) => void;
@@ -18,7 +19,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     const trimmedEmail = email.trim().toLowerCase();
     
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await apiFetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -29,21 +30,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       const data = await response.json();
 
       if (response.ok) {
-        localStorage.setItem('token', data.token);
+        setAccessToken(data.accessToken);
         
-        // Map backend _id to frontend id
-        const userObj = {
-          id: data._id,
+        const userObj: User = data.user || {
+          id: data._id || data.id,
           name: data.name,
           email: data.email,
           role: data.role,
           team: data.team,
         };
         
-        onLogin(userObj as any);
+        onLogin(userObj);
       } else {
         setErrorMessage(data.message || 'Invalid email or password. Please check your credentials.');
       }
+
     } catch (error) {
       setErrorMessage('Failed to connect to the server. Please try again later.');
     }

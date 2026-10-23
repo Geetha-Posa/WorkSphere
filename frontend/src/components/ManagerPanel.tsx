@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Task, User } from '../types';
+import { apiFetch } from '../api/client';
 
 export interface DriveFile {
   id: string;
@@ -23,12 +24,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ currentUser }) => {
 
   const fetchTasks = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/tasks/mine', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await apiFetch('/api/tasks/mine');
       if (response.ok) {
         const data = await response.json();
         setTasks(data);
@@ -50,14 +46,13 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({ currentUser }) => {
     setSyncError(null);
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/drive/sync/${encodeURIComponent(teamName)}`, {
+      const response = await apiFetch(`/api/drive/sync/${encodeURIComponent(teamName)}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
       });
+
 
       const data = await response.json();
 

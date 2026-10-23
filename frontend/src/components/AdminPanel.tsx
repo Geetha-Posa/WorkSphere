@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, UserRole, Team } from '../types';
+import { apiFetch } from '../api/client';
 
 export const AdminPanel: React.FC = () => {
   // Teams state
@@ -24,12 +25,7 @@ export const AdminPanel: React.FC = () => {
 
   const fetchUsers = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/users', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await apiFetch('/api/users');
       if (response.ok) {
         const data = await response.json();
         const formattedUsers = data.map((u: any) => ({
@@ -49,12 +45,7 @@ export const AdminPanel: React.FC = () => {
   const fetchTeams = async () => {
     try {
       setTeamsLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/teams', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await apiFetch('/api/teams');
       if (response.ok) {
         const data = await response.json();
         setTeams(data);
@@ -86,12 +77,10 @@ export const AdminPanel: React.FC = () => {
 
     try {
       setTeamSubmitting(true);
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/teams', {
+      const response = await apiFetch('/api/teams', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           name: trimmedName,
@@ -137,12 +126,10 @@ export const AdminPanel: React.FC = () => {
 
     try {
       setUserSubmitting(true);
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/users', {
+      const response = await apiFetch('/api/users', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           name: trimmedName,
@@ -152,6 +139,7 @@ export const AdminPanel: React.FC = () => {
           team: trimmedTeam,
         }),
       });
+
 
       const data = await response.json();
 
